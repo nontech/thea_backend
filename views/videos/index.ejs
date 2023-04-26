@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('../includes/head', {title: 'All videos'}) %>
+</head>
+<body>
+  <header>
+    <h1>All videos</h1>
+
+    <nav>
+      <a href="/">Home</a>&nbsp;|&nbsp;
+      <a href="/videos">All Videos</a>&nbsp;|&nbsp;
+    </nav>
+  </header>
+
+  <main>
+    <p>List of Videos</p>
+    <ul>
+      <% videos.forEach(video => { %>
+        <li>
+          <a href="/videos/<%= video.id %>"><%= video.title %></a>
+          <% if(!video.isAvailable) { %>
+            <span style="color: red;">(not available)</span>    
+          <% } %>
+        </li>
+      <% }) %>
+      </ul>
+  </main>
+
+  <footer>
+    Copyright BIH Charite
+  </footer>
+</body>
+</html>

@@ -1,6 +1,68 @@
 import express from 'express'
 import { logger } from './middlewares/logger.js'
 
+// Fake data
+const videos = [
+  {
+    "id": "1",
+    "title": "Big Buck Bunny",
+    "thumbnailUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Big_Buck_Bunny_thumbnail_vlc.png/1200px-Big_Buck_Bunny_thumbnail_vlc.png",
+    "duration": "8:18",
+    "uploadTime": "May 9, 2011",
+    "views": "24,969,123",
+    "author": "Vlc Media Player",
+    "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+    "isAvailable": true
+  },
+  {
+    "id": "2",
+    "title": "The first Blender Open Movie from 2006",
+    "thumbnailUrl": "https://i.ytimg.com/vi_webp/gWw23EYM9VM/maxresdefault.webp",
+    "duration": "12:18",
+    "uploadTime": "May 9, 2011",
+    "views": "24,969,123",
+    "author": "Blender Inc.",
+    "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    "isAvailable": false
+
+  },
+  {
+    "id": "3",
+    "title": "For Bigger Blazes",
+    "thumbnailUrl": "https://i.ytimg.com/vi/Dr9C2oswZfA/maxresdefault.jpg",
+    "duration": "8:18",
+    "uploadTime": "May 9, 2011",
+    "views": "24,969,123",
+    "author": "T-Series Regional",
+    "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+    "isAvailable": true
+  },
+  {
+    "id": "4",
+    "title": "For Bigger Escape",
+    "thumbnailUrl": "https://img.jakpost.net/c/2019/09/03/2019_09_03_78912_1567484272._large.jpg",
+    "duration": "8:18",
+    "uploadTime": "May 9, 2011",
+    "views": "24,969,123",
+    "author": "T-Series Regional",
+    "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+    "isAvailable": false
+  },
+  {
+    "id": "5",
+    "title": "Big Buck Bunny",
+    "thumbnailUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Big_Buck_Bunny_thumbnail_vlc.png/1200px-Big_Buck_Bunny_thumbnail_vlc.png",
+    "duration": "8:18",
+    "uploadTime": "May 9, 2011",
+    "views": "24,969,123",
+    "author": "Vlc Media Player",
+    "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+    "isAvailable": true
+  }
+]
+
+const videosSimpleList = ['Strawberry Fields Video', 'Penguin Love', 'Bunnys Hopping']
+
 const app = express()
 const PORT = 5000
 
@@ -28,22 +90,41 @@ app.use('/assets', express.static('public'))
 app.use(express.urlencoded({ extended: true }))
 
 
+// Configurations 
+app.set('view engine', 'ejs')
+
+
 // Routes
 
 // GET / => Home Page
 app.get('/', (request, response) => {
-  response.send('Thea Home Page')
+  const numberOfVideos = 10
+
+  // Rendering HTML for now
+  // Might be useless if frontend renders the page
+  response.render('index', { numberOfVideos: numberOfVideos })
 })
 
 // GET /videos => All Videos Page
 app.get('/videos', (request, response) => {
   console.log(request.query)
-  response.send('All Videos')
+
+  // [TODO]
+  // 1. Fetch videos list from database
+  // 2. Send as JSON response
+
+  // Rendering HTML for now
+  response.render('videos/index', { videos: videos})
 })
 
 // GET /videos/1 => Individual Video Page
 app.get('/videos/:id', (request, response) => {
   const { id } = request.params
+
+  // [TODO]
+  // 1. Fetch video data from database using id
+  // 2. Send as JSON response
+
   response.send('Individual Video Page with id ' + id)
 })
 
@@ -78,48 +159,6 @@ app.post('/api/v1/videos/1/mark-episode', express.json(), (request, response) =>
 // Other APIs
 // Edit an episode
 // Delete an episode
-
-
-// For practice
-
-const cookies = [
-  {
-    "id": 1,
-    "name": "Chocolate Chip",
-    "description": "A delicious chocolate chip cookie",
-    "price": 1.99,
-    "slug": "chocolate-chip",
-  },
-  {
-    "id": 2,
-    "name": "Chesse Cake",
-    "description": "A delicious chocolate chip cookie",
-    "price": 2,
-    "slug": "cheese",
-  },
-  {
-    "id": 3,
-    "name": "Vanilla Strawberry",
-    "description": "A delicious chocolate chip cookie",
-    "price": 3.50,
-    "slug": "vanilla-strawberry",
-  }
-]
-
-app.get('/cookies', (request, response) => {
-  response.send(cookies)
-})
-
-app.get('/cookies/:slug', (request, response) => {
-  const { slug } = request.params
-  for (const cookie of cookies) {
-    if (cookie.slug === slug) {
-      response.send(cookie)
-      return
-    }
-  }
-  response.send("No cookie found")
-})
 
 
 // Start the server
