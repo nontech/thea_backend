@@ -2,7 +2,7 @@ import express from 'express'
 import { logger } from './middlewares/logger.js'
 
 const app = express()
-const PORT = 3000
+const PORT = 5000
 
 
 // Middlewares
@@ -11,10 +11,21 @@ const PORT = 3000
 // Wed, 26 Apr 2023 09:20:40 GMT Request from ::1 GET /cookies/chocolate-chip
 app.use(logger)
 
+// Allow requests from http://localhost:3000
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+});
+
 // serves static files from the 'public' folder
 // localhost:3000/assets/landing.html
 // uses virtual path prefix '/assets'
 app.use('/assets', express.static('public'))
+
+// parses JSON bodies
+app.use(express.urlencoded({ extended: true }))
 
 
 // Routes
@@ -36,10 +47,37 @@ app.get('/videos/:id', (request, response) => {
   response.send('Individual Video Page with id ' + id)
 })
 
-// POST /videos/1/mark-episode => Feature Page
-app.post('/videos/1/mark-episode', (request, response) => {
-  response.send('Feature page: Users can mark epileptic episodes on a video')
+// API endpoints
+
+// Create a new episode
+// POST /videos/1/mark-episode
+// Route that requires JSON parsing middleware
+app.post('/api/v1/videos/1/mark-episode', express.json(), (request, response) => {
+  const incomingData = request.body
+
+  // Log to console
+  console.log(incomingData)
+
+  // [TODO] 
+  // 1: Save the incoming data to a database
+  // 2: Respond with an updated video data object
+
+  // Response fake data
+  const data = {
+    name: 'John Doe',
+    age: 30,
+    email: 'johndoe@example.com'
+  };
+
+  // Sends JSON response
+  response
+    .status(200)
+    .json(data);
 })
+
+// Other APIs
+// Edit an episode
+// Delete an episode
 
 
 // For practice

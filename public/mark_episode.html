@@ -1,0 +1,16 @@
+<html>
+  <head>
+    <title>Mark Episode</title>
+  </head>
+  <body>
+    <h1>User marked episode on a video</h1>
+    
+    <form action="/videos/1/mark-episode" method="POST">
+      <input type="text" name="start" placeholder="hh:mm:ss" /><br />
+      <input type="text" name="end" placeholder="hh:mm:ss" /><br />
+      <textarea name="description" placeholder="Describe the seizure"></textarea><br />
+
+      <button>Create Episode</button>
+    </form>
+  </body>
+</html>
