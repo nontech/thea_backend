@@ -1,87 +1,187 @@
 import express from 'express'
 import { logger } from './middlewares/logger.js'
+import mongoose from 'mongoose'
+import fileUpload from 'express-fileupload';
+import path from 'path';
 
 const app = express()
-const PORT = 3000
+const PORT = 5000
+
+// db connection
+mongoose.connect('mongodb://127.0.0.1:27017/thea_dev')
+  .then(() => console.log('Connected to database'))
+  .catch((error) => console.log(error))
+
+// SCHEMA
+const videoSchema = new mongoose.Schema({
+  filename: { type: String, required: true },
+  size: Number,
+  videoUrl: String,
+  thumbnailUrl: String,
+  duration: { type: Number, required: true },
+  recordedOn: String,
+  recordedBy: String,
+  reviewStatus: { type: [String], default: ["uploaded"] },
+  events: { type: [Number], default: [] },
+  uploadedOn: String,
+  uploadedBy: String,
+})
+
+// MODEL
+
+// A third parameter can be given for the collection name
+// const Video = mongoose.model('Video', videoSchema, 'myvideos');
+// Else Mongoose generates a collection name by pluralizing 
+// the model name 'Video' to 'videos'
+const Video = mongoose.model('Video', videoSchema)
 
 
-// Middlewares
+// MIDDLEWARES
 
 // logs to the terminal
 // Wed, 26 Apr 2023 09:20:40 GMT Request from ::1 GET /cookies/chocolate-chip
 app.use(logger)
 
+// Allow requests from http://localhost:3000
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+});
+
 // serves static files from the 'public' folder
-// localhost:3000/assets/landing.html
+// localhost:5000/assets/landing.html
 // uses virtual path prefix '/assets'
 app.use('/assets', express.static('public'))
 
+// Serve the videos from the 'uploads/' directory
+// localhost:5000/videos/filename
+// uses virtual path prefix '/videos'
+app.use('/videos', express.static('uploads'));
+
+// parses JSON bodies
+app.use(express.urlencoded({ extended: true }))
+
+// Configurations 
+app.set('view engine', 'ejs')
+
+// File Uploads
+app.use(fileUpload());
 
 // Routes
 
 // GET / => Home Page
 app.get('/', (request, response) => {
-  response.send('Thea Home Page')
+  const numberOfVideos = 10
+
+  // Rendering HTML for now
+  // Might be useless if frontend renders the page
+  response.render('index', { numberOfVideos: numberOfVideos })
 })
 
-// GET /videos => All Videos Page
-app.get('/videos', (request, response) => {
-  console.log(request.query)
-  response.send('All Videos')
-})
+// API - Get All Videos
+app.get('/api/videos', async (request, response) => {
+  try {
 
-// GET /videos/1 => Individual Video Page
-app.get('/videos/:id', (request, response) => {
-  const { id } = request.params
-  response.send('Individual Video Page with id ' + id)
-})
+    const videos = await Video.find({}).exec()
+    response.send(videos)
 
-// POST /videos/1/mark-episode => Feature Page
-app.post('/videos/1/mark-episode', (request, response) => {
-  response.send('Feature page: Users can mark epileptic episodes on a video')
-})
+  }catch (error) {
 
+    console.log(error)
+    response.status(500).send('Error fetching videos')
 
-// For practice
-
-const cookies = [
-  {
-    "id": 1,
-    "name": "Chocolate Chip",
-    "description": "A delicious chocolate chip cookie",
-    "price": 1.99,
-    "slug": "chocolate-chip",
-  },
-  {
-    "id": 2,
-    "name": "Chesse Cake",
-    "description": "A delicious chocolate chip cookie",
-    "price": 2,
-    "slug": "cheese",
-  },
-  {
-    "id": 3,
-    "name": "Vanilla Strawberry",
-    "description": "A delicious chocolate chip cookie",
-    "price": 3.50,
-    "slug": "vanilla-strawberry",
   }
-]
-
-app.get('/cookies', (request, response) => {
-  response.send(cookies)
 })
 
-app.get('/cookies/:slug', (request, response) => {
-  const { slug } = request.params
-  for (const cookie of cookies) {
-    if (cookie.slug === slug) {
-      response.send(cookie)
-      return
-    }
+
+// API - Get Video Metadata by ID
+app.get('/api/videos/:id/metadata', async (req, res) => {
+  try {
+
+    const { id } = req.params;
+    const video = await Video.findOne({ _id: id }).exec()
+    if(!video) throw new Error('Cookie not found')
+
+    res.send(video)
+
+  }catch(error) {
+
+    console.error(error)
+    res.status(500).send('Could not find the cookie you\'re looking for.')
+
   }
-  response.send("No cookie found")
+});
+
+
+// API - Upload Video
+app.post('/api/upload-video', async (req, res) => {
+  // videoFile is an object with the following properties
+  // {
+  //   name: 'Big_Bunny.mp4',
+  //   data: <Buffer 00 00 00 20 06 ... 10546570 more bytes>,
+  //   size: 10546620,
+  //   encoding: '7bit',
+  //   tempFilePath: '',
+  //   truncated: false,
+  //   mimetype: 'video/mp4',
+  //   md5: '5021b3b7c402468d5b018a8b4a2b448a',
+  //   mv: [Function: mv]
+  // }
+  const videoFile = req.files.video
+
+  // get the absolute path of the uploads directory
+  const uploadDir = path.resolve('./uploads')
+ 
+  try {
+    //  mv()- function by express-fileupload middleware 
+    // move the uploaded file to the specified path
+    // saves video file on disk to uploads directory
+    await videoFile.mv(path.join(uploadDir, videoFile.name))
+
+    // create video metadata object document
+    const videoPath = path.join(uploadDir, videoFile.name)
+    const { name, size } = videoFile
+    // use model to create document
+    // _id is generated by Mongoose's ObjectId function 
+    // and is given a default value, even before saving to database
+    const videoData = new Video({ 
+      filename: name,
+      size: size,
+      videoUrl: videoPath,
+      thumbnailUrl: '',
+      duration: 180,
+      recordedOn: 'May 9, 2011',
+      recordedBy: 'Christian Meisel',
+      reviewStatus: ["uploaded"],
+      events: [],
+      uploadedOn: 'May 10, 2011',
+      uploadedBy: 'Gadi Miron',
+    });
+    
+    // create a new document in the database
+    await videoData.save()
+
+    res.status(200).json({ message: 'Video uploaded successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error uploading file');
+  }
+});
+
+// [LATER] Other APIs
+// Delete a video
+// Rename it's title or filename
+
+// API - Create Episode on a video
+// Route that requires JSON parsing middleware
+app.post('/api/videos/:id/mark-episode', express.json(), (request, response) => {
 })
+
+// [LATER] Other APIs
+// Edit an episode
+// Delete an episode
 
 
 // Start the server

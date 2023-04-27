@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('includes/head', {title: 'Home'}) %>
+<body>
+  <header>
+    <h1>Server-Rendered Home Page in Express.js</h1>
+
+    <nav>
+      <a href="/">Home</a>&nbsp;|&nbsp;
+    </nav>
+  </header>
+
+  <main>
+    <p>Welcome to Thea. 👋</p>
+    <p>A video analysis platform for Epileptic Patients</p>
+
+    <h3>Escaped string</h3>
+    <%= '<h4>This HTML will be as it is</h4>' %>
+
+    <h3>Unescaped string</h3>
+    <%- '<h4>This will be rendered as HTML</h4>' %>
+
+    <h3>We currently have <%= numberOfVideos %> Videos on our platform</h3>
+  </main>
+
+  <footer>
+    Copyright BIH - Thea
+  </footer>
+</body>
+</html>
