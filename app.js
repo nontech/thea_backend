@@ -1,68 +1,8 @@
 import express from 'express'
 import { logger } from './middlewares/logger.js'
 import mongoose from 'mongoose'
-
-// Fake data
-const videos = [
-  {
-    "id": "1",
-    "title": "Big Buck Bunny",
-    "thumbnailUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Big_Buck_Bunny_thumbnail_vlc.png/1200px-Big_Buck_Bunny_thumbnail_vlc.png",
-    "duration": "8:18",
-    "uploadTime": "May 9, 2011",
-    "views": "24,969,123",
-    "author": "Vlc Media Player",
-    "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    "isAvailable": true
-  },
-  {
-    "id": "2",
-    "title": "The first Blender Open Movie from 2006",
-    "thumbnailUrl": "https://i.ytimg.com/vi_webp/gWw23EYM9VM/maxresdefault.webp",
-    "duration": "12:18",
-    "uploadTime": "May 9, 2011",
-    "views": "24,969,123",
-    "author": "Blender Inc.",
-    "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    "isAvailable": false
-
-  },
-  {
-    "id": "3",
-    "title": "For Bigger Blazes",
-    "thumbnailUrl": "https://i.ytimg.com/vi/Dr9C2oswZfA/maxresdefault.jpg",
-    "duration": "8:18",
-    "uploadTime": "May 9, 2011",
-    "views": "24,969,123",
-    "author": "T-Series Regional",
-    "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    "isAvailable": true
-  },
-  {
-    "id": "4",
-    "title": "For Bigger Escape",
-    "thumbnailUrl": "https://img.jakpost.net/c/2019/09/03/2019_09_03_78912_1567484272._large.jpg",
-    "duration": "8:18",
-    "uploadTime": "May 9, 2011",
-    "views": "24,969,123",
-    "author": "T-Series Regional",
-    "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-    "isAvailable": false
-  },
-  {
-    "id": "5",
-    "title": "Big Buck Bunny",
-    "thumbnailUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Big_Buck_Bunny_thumbnail_vlc.png/1200px-Big_Buck_Bunny_thumbnail_vlc.png",
-    "duration": "8:18",
-    "uploadTime": "May 9, 2011",
-    "views": "24,969,123",
-    "author": "Vlc Media Player",
-    "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    "isAvailable": true
-  }
-]
-
-const videosSimpleList = ['Strawberry Fields Video', 'Penguin Love', 'Bunnys Hopping']
+import fileUpload from 'express-fileupload';
+import path from 'path';
 
 const app = express()
 const PORT = 5000
@@ -72,19 +12,27 @@ mongoose.connect('mongodb://127.0.0.1:27017/thea_dev')
   .then(() => console.log('Connected to database'))
   .catch((error) => console.log(error))
 
-
+// schema
 const videoSchema = new mongoose.Schema({
   filename: { type: String, required: true },
+  size: Number,
   videoUrl: String,
   thumbnailUrl: String,
   duration: { type: Number, required: true },
   recordedOn: String,
   recordedBy: String,
+  reviewStatus: { type: [String], default: ["uploaded"] },
+  events: { type: [Number], default: [] },
   uploadedOn: String,
   uploadedBy: String,
 })
 
+// model
+// Mongoose generates a collection name by pluralizing 
+// the model name 'Video' to 'videos'
 const Video = mongoose.model('Video', videoSchema)
+// A third parameter can be given for the collection name
+// const Video = mongoose.model('Video', videoSchema, 'myvideos');
 
 // const userSchema = new mongoose.Schema({
 //   name: { type: String, required: true },
@@ -126,10 +74,11 @@ app.use('/assets', express.static('public'))
 // parses JSON bodies
 app.use(express.urlencoded({ extended: true }))
 
-
 // Configurations 
 app.set('view engine', 'ejs')
 
+// File Uploads
+app.use(fileUpload());
 
 // Routes
 
@@ -154,27 +103,64 @@ app.get('/videos', (request, response) => {
   response.render('videos/index', { videos: videos})
 })
 
-// POST /videos => Create Video
-app.post('/videos', async (request, response) => {
+
+// API - Upload Video
+app.post('/api/upload-video', async (req, res) => {
+  // videoFile is an object with the following properties
+  // {
+  //   name: 'Big_Bunny.mp4',
+  //   data: <Buffer 00 00 00 20 06 ... 10546570 more bytes>,
+  //   size: 10546620,
+  //   encoding: '7bit',
+  //   tempFilePath: '',
+  //   truncated: false,
+  //   mimetype: 'video/mp4',
+  //   md5: '5021b3b7c402468d5b018a8b4a2b448a',
+  //   mv: [Function: mv]
+  // }
+  const videoFile = req.files.video
+
+  // get the absolute path of the uploads directory
+  const uploadDir = path.resolve('./uploads')
+ 
   try {
-    const video = new Video({
-      filename: 'On a chair spasm',
-      videoUrl: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-      thumbnailUrl: 'https://i.ytimg.com/vi/Dr9C2oswZfA/maxresdefault.jpg',
+    //  mv()- function by express-fileupload middleware 
+    // move the uploaded file to the specified path
+    // saves video file on disk to uploads directory
+    await videoFile.mv(path.join(uploadDir, videoFile.name))
+
+    // create video metadata object document
+    const videoPath = path.join(uploadDir, videoFile.name)
+    const { name, size } = videoFile
+    // use model to create document
+    // _id is generated by Mongoose's ObjectId function 
+    // and given a default value
+    const videoData = new Video({ 
+      filename: name,
+      size: size,
+      videoUrl: videoPath,
+      thumbnailUrl: '',
       duration: 180,
       recordedOn: 'May 9, 2011',
       recordedBy: 'Christian Meisel',
-      uploadedOn: 'May 9, 2011',
+      reviewStatus: ["uploaded"],
+      events: [],
+      uploadedOn: 'May 10, 2011',
       uploadedBy: 'Gadi Miron',
-    })
-    await video.save()
+    });
 
-    response.send('Video saved')
+    // console.log(videoData);
+    
+    await videoData.save()
+
+    res.status(200).json({ message: 'Video uploaded successfully' });
   } catch (error) {
-    console.log(error)
-    response.send('Error: The video could not be saved')
+    console.error(error);
+    res.status(500).send('Error uploading file');
   }
-})
+});
+
+
 // GET /videos/1 => Individual Video Page
 app.get('/videos/:id', (request, response) => {
   const { id } = request.params
