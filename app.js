@@ -3,12 +3,12 @@ import { logger } from './middlewares/logger.js'
 import mongoose from 'mongoose'
 import fileUpload from 'express-fileupload';
 import path from 'path';
+import 'dotenv/config'
 
 const app = express()
-const PORT = 5000
 
 // db connection
-mongoose.connect('mongodb://127.0.0.1:27017/thea_dev')
+mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Connected to database'))
   .catch((error) => console.log(error))
 
@@ -185,6 +185,6 @@ app.post('/api/videos/:id/mark-episode', express.json(), (request, response) => 
 
 
 // Start the server
-app.listen(PORT, () => {
-  console.log(`👋 Started server on port ${PORT}`)
+app.listen(process.env.PORT, () => {
+  console.log(`👋 Started server on port ${process.env.PORT}`)
 })

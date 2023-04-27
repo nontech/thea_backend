@@ -6,3 +6,6 @@ node_modules
 
 # videos
 uploads/
+
+# environment variables
+.env
