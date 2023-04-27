@@ -1,5 +1,6 @@
 import express from 'express'
 import { logger } from './middlewares/logger.js'
+import mongoose from 'mongoose'
 
 // Fake data
 const videos = [
@@ -66,6 +67,42 @@ const videosSimpleList = ['Strawberry Fields Video', 'Penguin Love', 'Bunnys Hop
 const app = express()
 const PORT = 5000
 
+// db connection
+mongoose.connect('mongodb://127.0.0.1:27017/thea_dev')
+  .then(() => console.log('Connected to database'))
+  .catch((error) => console.log(error))
+
+
+const videoSchema = new mongoose.Schema({
+  filename: { type: String, required: true },
+  videoUrl: String,
+  thumbnailUrl: String,
+  duration: { type: Number, required: true },
+  recordedOn: String,
+  recordedBy: String,
+  uploadedOn: String,
+  uploadedBy: String,
+})
+
+const Video = mongoose.model('Video', videoSchema)
+
+// const userSchema = new mongoose.Schema({
+//   name: { type: String, required: true },
+//   email: { type: String, unique: true, required: true },
+//   passwordHash: { type: String, required: true },
+//   videos: [videoSchema]
+// })
+
+// const episodeSchema = new mongoose.Schema({
+//   videoId: videoSchema.id, // foreign key
+//   title: { type: String, required: true },
+//   description: String,
+//   start: { type: Number, required: true },
+//   end: { type: Number, required: true },
+// })
+
+
+
 
 // Middlewares
 
@@ -117,6 +154,27 @@ app.get('/videos', (request, response) => {
   response.render('videos/index', { videos: videos})
 })
 
+// POST /videos => Create Video
+app.post('/videos', async (request, response) => {
+  try {
+    const video = new Video({
+      filename: 'On a chair spasm',
+      videoUrl: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      thumbnailUrl: 'https://i.ytimg.com/vi/Dr9C2oswZfA/maxresdefault.jpg',
+      duration: 180,
+      recordedOn: 'May 9, 2011',
+      recordedBy: 'Christian Meisel',
+      uploadedOn: 'May 9, 2011',
+      uploadedBy: 'Gadi Miron',
+    })
+    await video.save()
+
+    response.send('Video saved')
+  } catch (error) {
+    console.log(error)
+    response.send('Error: The video could not be saved')
+  }
+})
 // GET /videos/1 => Individual Video Page
 app.get('/videos/:id', (request, response) => {
   const { id } = request.params
