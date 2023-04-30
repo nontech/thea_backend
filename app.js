@@ -4,6 +4,7 @@ import mongoose from 'mongoose'
 import fileUpload from 'express-fileupload';
 import path from 'path';
 import 'dotenv/config'
+import cors from 'cors';
 
 const app = express()
 
@@ -42,13 +43,10 @@ const Video = mongoose.model('Video', videoSchema)
 // Wed, 26 Apr 2023 09:20:40 GMT Request from ::1 GET /cookies/chocolate-chip
 app.use(logger)
 
-// Allow requests from http://localhost:3000
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  next();
-});
+//  Cross-Origin Resource Sharing (CORS) setup
+app.use(cors({
+  origin: process.env.CORS_ORIGIN
+}))
 
 // serves static files from the 'public' folder
 // localhost:5000/assets/landing.html
