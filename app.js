@@ -1,32 +1,46 @@
 import express from 'express'
 import { logger } from './middlewares/logger.js'
 import mongoose from 'mongoose'
+import mongodb from 'mongodb';
+import { GridFSBucket } from 'mongodb';
 import fileUpload from 'express-fileupload';
-import path from 'path';
 import 'dotenv/config'
 import cors from 'cors';
+import { Readable } from 'stream';
+
 
 const app = express()
 
-// db connection
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to database'))
-  .catch((error) => console.log(error))
+// Create a Mongoose connection to the MongoDB database
+mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+.then(() => {
+  console.log('Connected to MongoDB');
 
-// SCHEMA
-const videoSchema = new mongoose.Schema({
-  filename: { type: String, required: true },
-  size: Number,
-  videoUrl: String,
-  thumbnailUrl: String,
-  duration: { type: Number, required: true },
-  recordedOn: String,
-  recordedBy: String,
-  reviewStatus: { type: [String], default: ["uploaded"] },
-  events: { type: [Number], default: [] },
-  uploadedOn: String,
-  uploadedBy: String,
+  // Start the server
+  app.listen(process.env.PORT, () => {
+    console.log(`👋 Started server on port ${process.env.PORT}`)
+  });
 })
+.catch(err => {
+  console.log('Error connecting to MongoDB', err);
+  process.exit(1);
+});
+
+// SCHEMA example
+// const videoSchema = new mongoose.Schema({
+//   filename: { type: String, required: true },
+//   size: Number,
+//   videoUrl: String,
+//   thumbnailUrl: String,
+//   duration: { type: Number, required: true },
+//   recordedOn: String,
+//   recordedBy: String,
+//   reviewStatus: { type: [String], default: ["uploaded"] },
+//   events: { type: [Number], default: [] },
+//   uploadedOn: String,
+//   uploadedBy: String,
+//   // data: Buffer
+// })
 
 // MODEL
 
@@ -34,7 +48,7 @@ const videoSchema = new mongoose.Schema({
 // const Video = mongoose.model('Video', videoSchema, 'myvideos');
 // Else Mongoose generates a collection name by pluralizing 
 // the model name 'Video' to 'videos'
-const Video = mongoose.model('Video', videoSchema)
+// const Video = mongoose.model('Video', videoSchema)
 
 
 // MIDDLEWARES
@@ -52,11 +66,6 @@ app.use(cors({
 // localhost:5000/assets/landing.html
 // uses virtual path prefix '/assets'
 app.use('/assets', express.static('public'))
-
-// Serve the videos from the 'uploads/' directory
-// localhost:5000/videos/filename
-// uses virtual path prefix '/videos'
-app.use('/videos', express.static('uploads'));
 
 // parses JSON bodies
 app.use(express.urlencoded({ extended: true }))
@@ -78,11 +87,37 @@ app.get('/', (request, response) => {
   response.render('index', { numberOfVideos: numberOfVideos })
 })
 
+
 // API - Get All Videos
 app.get('/api/videos', async (request, response) => {
   try {
+    const db = mongoose.connection.db
+    const bucket = new GridFSBucket(db);
+    const cursor = bucket.find({});
 
-    const videos = await Video.find({}).exec()
+    // videos is an array of objects
+    // precisely from 'fs.files' GridFS collection
+    // [
+    //   {
+    //     _id: new ObjectId("6450620edbf68b6f07bc801c"),
+    //     length: 33157948,
+    //     chunkSize: 261120,
+    //     uploadDate: 2023-05-02T01:06:23.999Z,
+    //     filename: 'LABORATORIES-SCIENCE_12',
+    //     metadata: {
+    //       thumbnailUrl: '',
+    //       description: '',
+    //       duration: 180,
+    //       recordedOn: 'May 9, 2011',
+    //       recordedBy: 'Christian Meisel',
+    //       reviewStatus: [Array],
+    //       events: [],
+    //       uploadedBy: 'Gadi Miron'
+    //     }
+    //   }, ...
+    // ]
+    const videos = await cursor.toArray()
+
     response.send(videos)
 
   }catch (error) {
@@ -93,29 +128,9 @@ app.get('/api/videos', async (request, response) => {
   }
 })
 
-
-// API - Get Video Metadata by ID
-app.get('/api/videos/:id/metadata', async (req, res) => {
-  try {
-
-    const { id } = req.params;
-    const video = await Video.findOne({ _id: id }).exec()
-    if(!video) throw new Error('Video not found')
-
-    res.send(video)
-
-  }catch(error) {
-
-    console.error(error)
-    res.status(500).send('Could not find the video you\'re looking for.')
-
-  }
-});
-
-
 // API - Upload Video
 app.post('/api/upload-video', async (req, res) => {
-  // videoFile is an object with the following properties
+  // videoFile (req.files.video) is an object with the following properties
   // {
   //   name: 'Big_Bunny.mp4',
   //   data: <Buffer 00 00 00 20 06 ... 10546570 more bytes>,
@@ -127,49 +142,63 @@ app.post('/api/upload-video', async (req, res) => {
   //   md5: '5021b3b7c402468d5b018a8b4a2b448a',
   //   mv: [Function: mv]
   // }
-  const videoFile = req.files.video
+  const { name, data } = req.files.video
 
-  // get the absolute path of the uploads directory
-  const uploadDir = path.resolve('./uploads')
-  console.log('uploadDir', uploadDir)
- 
-  try {
-    //  mv()- function by express-fileupload middleware 
-    // move the uploaded file to the specified path
-    // saves video file on disk to uploads directory
-    await videoFile.mv(path.join(uploadDir, videoFile.name))
+  const db = mongoose.connection.db
+  const bucket = new mongodb.GridFSBucket(db);
 
-    console.log('videoFile is saved to ', path.join(uploadDir, videoFile.name))
-
-    // create video metadata object document
-    const videoPath = path.join(uploadDir, videoFile.name)
-    console.log('videoPath', videoPath)
-    const { name, size } = videoFile
-    // use model to create document
-    // _id is generated by Mongoose's ObjectId function 
-    // and is given a default value, even before saving to database
-    const videoData = new Video({ 
-      filename: name,
-      size: size,
-      videoUrl: videoPath,
+  // create upload stream using GridFS bucket
+  const videoUploadStream = bucket.openUploadStream(name.split(".")[0], {
+    // Add extra details about the video file
+    metadata: {
       thumbnailUrl: '',
+      description: '',
       duration: 180,
       recordedOn: 'May 9, 2011',
       recordedBy: 'Christian Meisel',
       reviewStatus: ["uploaded"],
       events: [],
-      uploadedOn: 'May 10, 2011',
-      uploadedBy: 'Gadi Miron',
-    });
-    
-    // create a new document in the database
-    await videoData.save()
+      uploadedBy: 'Gadi Miron'
+    },
+  });
 
-    res.status(200).json({ message: 'Video uploaded successfully' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Error uploading file');
-  }
+  // create read stream from video file buffer
+  const videoReadStream = new Readable();
+  videoReadStream.push(data);
+  videoReadStream.push(null);
+
+  // Finally Upload!
+  videoReadStream.pipe(videoUploadStream)
+    .on('error', () => {
+      res.status(500).send({ message: 'Error uploading file' });
+    })
+    .on('finish', () => {
+      // All done!
+      res.status(200).send({ message: 'File uploaded successfully' });
+    });
+});
+
+// API - Get Video by ID
+app.get('/api/video/:id', async (req, res) => {
+  const id = req.params.id;
+  
+  const db = mongoose.connection.db;
+  const bucket = new mongodb.GridFSBucket(db);
+
+  // Get the file stream from GridFS
+  const downloadStream = bucket.openDownloadStream(new mongodb.ObjectId(id));
+
+  // Set the content type header
+  res.set('Content-Type', 'video/mp4');
+
+  // Pipe the file stream to the response object
+  downloadStream.pipe(res)
+    .on('error', () => {
+      res.status(404).send({ message: 'File not found' });
+    })
+    .on('finish', () => {
+      res.end();
+    });
 });
 
 // [LATER] Other APIs
@@ -187,6 +216,6 @@ app.post('/api/videos/:id/mark-episode', express.json(), (request, response) => 
 
 
 // Start the server
-app.listen(process.env.PORT, () => {
-  console.log(`👋 Started server on port ${process.env.PORT}`)
-})
+// app.listen(process.env.PORT, () => {
+//   console.log(`👋 Started server on port ${process.env.PORT}`)
+// })
