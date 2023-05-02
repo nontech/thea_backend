@@ -29,18 +29,20 @@ This is the backend API for the __Thea__ application built using __ExpressJS__.
     ```
 2. Install dependencies
     ```
-    cd {your_repository_name}
+    cd thea_backend
     npm install
     ```
+3. Make sure MongoDB is installed and running locally on your computer. [Follow these steps](https://www.mongodb.com/docs/manual/administration/install-community/)
 
-3. Create a `.env` file in the root of the project with the following variables
+4. Create a `.env` file in the root of the project with the following variables
     ```
     PORT=5000
     MONGO_URI=mongodb://localhost:27017/thea_local
+    CORS_ORIGIN=*
     ```
     Note: Change the MONGO_URI to your MongoDB connection string
     
-4. Start the server
+5. Start the server
     ```
     npm start
     ```
@@ -51,7 +53,7 @@ This is the backend API for the __Thea__ application built using __ExpressJS__.
 
 - `GET /api/videos` - Get list of all uploaded videos
 - `POST /api/upload-video` - Upload a video
-- `POST /api/videos/:id/metadata` - Get details of a specific video
+- `POST /api/videos/:id` - Get a video
 - `POST /api/videos/:id/mark-episode` - Mark a video with an epileptic episode
 
 ### Error Responses
